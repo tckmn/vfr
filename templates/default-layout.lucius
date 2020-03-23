@@ -1,73 +1,35 @@
-.masthead,
-.navbar {
-    background-color: rgb(27, 28, 29);
+@bg1: #181818;
+@bg2: #282828;
+@fg1: #d8d8d8;
+
+html, body {
+    height: 100%;
+    background-color: #{bg1};
+    color: #{fg1};
+    margin: 0;
 }
 
-.navbar-default .navbar-nav > .active > a {
-    background-color: transparent;
-    border-bottom: 2px solid white;
+body {
+    display: flex;
+    flex-direction: column;
+    > * { padding: 1em; }
 }
 
-.navbar-nav {
-    padding-bottom: 1em;
+main {
+    flex: 1 0 auto;
+    width: 100%;
+    max-width: 800px;
+    align-self: center;
 }
 
-.masthead {
-    margin-top: -21px;
-    color: white;
-    text-align: center;
-    min-height: 500px;
+header, footer {
+    flex-shrink: 0;
+    background-color: #{bg2};
 }
 
-.masthead .header {
-    max-width: 700px;
-    margin: 0 auto;
-    font-family: Lato,'Helvetica Neue',Arial,Helvetica,sans-serif;
+footer {
+    text-align: right;
 }
 
-.masthead h1.header {
-    margin-top: 1em;
-    margin-bottom: 0em;
-    font-size: 4.5em;
-    line-height: 1.2em;
-    font-weight: normal;
- }
-
-.masthead h2 {
-    font-size: 1.7em;
-    font-weight: normal;
-}
-
-.masthead .btn {
-    margin: 1em 0;
-}
-
-
-/* Common styles for all types */
-.bs-callout {
-  padding: 20px;
-  margin: 20px 0;
-  border: 1px solid #eee;
-  border-left-width: 5px;
-  border-radius: 3px;
-}
-
-.bs-callout p:last-child {
-  margin-bottom: 0;
-}
-
-.bs-callout-info {
-  border-left-color: #1b809e;
-}
-
-/* Space things out */
-.bs-docs-section {
-  margin-bottom: 60px;
-}
-.bs-docs-section:last-child {
-  margin-bottom: 0;
-}
-
-#message {
-    margin-bottom: 40px;
-}
+a { color: #7cafc2; }
+a:visited { color: #ba8baf; }

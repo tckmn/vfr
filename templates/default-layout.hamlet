@@ -1,50 +1,22 @@
+$newline never
 
-<!-- Static navbar -->
-<nav .navbar.navbar-default.navbar-static-top>
-    <div .container>
-        <div .navbar-header>
-            <button type="button" .navbar-toggle.collapsed data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
-                <span class="sr-only">Toggle navigation</span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
-                <span class="icon-bar"></span>
+<header>
+    <ul #navleft>
+        $forall MenuItem label route _ <- navbarLeftFilteredMenuItems
+            <li :Just route == mcurrentRoute:.active>
+                <a href=@{route}>#{label}
 
-        <div #navbar .collapse.navbar-collapse>
-            <ul .nav.navbar-nav>
-                $forall MenuItem label route _ <- navbarLeftFilteredMenuItems
-                    <li :Just route == mcurrentRoute:.active>
-                        <a href="@{route}">#{label}
+    <ul #navright>
+        $forall MenuItem label route _ <- navbarRightFilteredMenuItems
+            <li :Just route == mcurrentRoute:.active>
+                <a href=@{route}>#{label}
 
-            <ul .nav.navbar-nav.navbar-right>
-                $forall MenuItem label route _ <- navbarRightFilteredMenuItems
-                    <li :Just route == mcurrentRoute:.active>
-                        <a href="@{route}">#{label}
-
-<!-- Page Contents -->
-
-<div .container>
-    $if not $ Just HomeR == mcurrentRoute
-        <ul .breadcrumb>
-            $forall bc <- parents
-                <li>
-                    <a href="@{fst bc}">#{snd bc}
-
-            <li .active>#{title}
-
+<main>
     $maybe msg <- mmsg
-      <div .alert.alert-info #message>#{msg}
+        <div .alert>#{msg}
 
-
-$if (Just HomeR == mcurrentRoute)
     ^{widget}
-$else
-    <div .container>
-        <div .row>
-            <div .col-md-12>
-                ^{widget}
 
-<!-- Footer -->
-<footer .footer>
-    <div .container>
-        <p .text-muted>
-            #{appCopyright $ appSettings master}
+<footer>
+    made with ❤ and a desire to play tichu, #
+    <a href='https://github.com/tckmn/vfr'>source code available
