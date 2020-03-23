@@ -1,5 +1,6 @@
 @bg1: #181818;
 @bg2: #282828;
+@bg3: #383838;
 @fg1: #d8d8d8;
 
 html, body {
@@ -25,6 +26,28 @@ main {
 header, footer {
     flex-shrink: 0;
     background-color: #{bg2};
+}
+
+header {
+    #logo { height: 64px; }
+    > div {
+        display: flex;
+        flex-direction: row;
+    }
+    > div#tophead {
+        justify-content: space-between;
+        margin-bottom: 1em;
+    }
+    > div#bothead > a {
+        text-decoration: none;
+        color: #{fg1};
+        padding: 3px 1em;
+        margin: 0 3px;
+        border-radius: 3px;
+    }
+    > div#bothead > a.active, > div#bothead > a:hover {
+        background-color: #{bg3};
+    }
 }
 
 footer {

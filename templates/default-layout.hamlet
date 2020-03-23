@@ -1,15 +1,14 @@
 $newline never
 
 <header>
-    <ul #navleft>
-        $forall MenuItem label route _ <- navbarLeftFilteredMenuItems
-            <li :Just route == mcurrentRoute:.active>
-                <a href=@{route}>#{label}
-
-    <ul #navright>
-        $forall MenuItem label route _ <- navbarRightFilteredMenuItems
-            <li :Just route == mcurrentRoute:.active>
-                <a href=@{route}>#{label}
+    <div #tophead>
+        <a href=@{HomeR}>
+            <img #logo src=@{StaticR img_logo_svg}>
+        $with MenuItem label route <- authItem
+            <a href=@{route}>#{label}
+    <div #bothead>
+        $forall MenuItem label route <- menuItems
+            <a :Just route == mcurrentRoute:.active href=@{route}>#{label}
 
 <main>
     $maybe msg <- mmsg

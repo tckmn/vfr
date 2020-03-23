@@ -41,12 +41,7 @@ data App = App
 data MenuItem = MenuItem
     { menuItemLabel :: Text
     , menuItemRoute :: Route App
-    , menuItemAccessCallback :: Bool
     }
-
-data MenuTypes
-    = NavbarLeft MenuItem
-    | NavbarRight MenuItem
 
 -- This is where we define all of the routes in our application. For a full
 -- explanation of the syntax, please see:
@@ -105,35 +100,14 @@ instance Yesod App where
         muser <- maybeAuthPair
         mcurrentRoute <- getCurrentRoute
 
-        -- Define the menu items of the header.
         let menuItems =
-                [ NavbarLeft $ MenuItem
-                    { menuItemLabel = "Home"
-                    , menuItemRoute = HomeR
-                    , menuItemAccessCallback = True
-                    }
-                , NavbarLeft $ MenuItem
-                    { menuItemLabel = "Profile"
-                    , menuItemRoute = ProfileR
-                    , menuItemAccessCallback = isJust muser
-                    }
-                , NavbarRight $ MenuItem
-                    { menuItemLabel = "Login"
-                    , menuItemRoute = AuthR LoginR
-                    , menuItemAccessCallback = isNothing muser
-                    }
-                , NavbarRight $ MenuItem
-                    { menuItemLabel = "Logout"
-                    , menuItemRoute = AuthR LogoutR
-                    , menuItemAccessCallback = isJust muser
-                    }
+                [ MenuItem "home" HomeR
+                , MenuItem "profile" ProfileR
                 ]
 
-        let navbarLeftMenuItems = [x | NavbarLeft x <- menuItems]
-        let navbarRightMenuItems = [x | NavbarRight x <- menuItems]
-
-        let navbarLeftFilteredMenuItems = [x | x <- navbarLeftMenuItems, menuItemAccessCallback x]
-        let navbarRightFilteredMenuItems = [x | x <- navbarRightMenuItems, menuItemAccessCallback x]
+        let authItem = case muser of
+                         Just _  -> MenuItem "logout" $ AuthR LogoutR
+                         Nothing -> MenuItem "login"  $ AuthR LoginR
 
         -- We break up the default layout into two components:
         -- default-layout is the contents of the body tag, and
