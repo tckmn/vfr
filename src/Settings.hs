@@ -55,6 +55,9 @@ data AppSettings = AppSettings
 
     , appAuthDummyLogin         :: Bool
     -- ^ Indicate if auth dummy login should be enabled.
+
+    , appClientId               :: Text
+    , appClientSecret           :: Text
     }
 
 instance FromJSON AppSettings where
@@ -81,6 +84,9 @@ instance FromJSON AppSettings where
         appSkipCombining          <- o .:? "skip-combining"   .!= dev
 
         appAuthDummyLogin         <- o .:? "auth-dummy-login"      .!= dev
+
+        appClientId               <- o .: "client-id"
+        appClientSecret           <- o .: "client-secret"
 
         return AppSettings {..}
 
