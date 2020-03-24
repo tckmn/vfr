@@ -7,6 +7,8 @@
 {-# LANGUAGE ExplicitForAll #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 module Foundation where
 
@@ -26,6 +28,8 @@ import qualified Yesod.Core.Unsafe as Unsafe
 import qualified Data.CaseInsensitive as CI
 import qualified Data.Text.Encoding as TE
 
+import GHC.Generics
+
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
 -- starts running, such as database connections. Every handler will have
@@ -42,6 +46,12 @@ data MenuItem = MenuItem
     { menuItemLabel :: Text
     , menuItemRoute :: Route App
     }
+
+data OAuthResponse = OAuthResponse
+    { name :: Maybe Text
+    , email :: Text
+    , picture :: Maybe Text
+    } deriving (Generic, ToJSON, FromJSON)
 
 -- This is where we define all of the routes in our application. For a full
 -- explanation of the syntax, please see:
@@ -208,10 +218,23 @@ instance YesodAuth App where
         x <- getBy $ UniqueUser $ credsIdent creds
         case x of
             Just (Entity uid _) -> return $ Authenticated uid
-            Nothing -> Authenticated <$> insert User
-                { userIdent = credsIdent creds
-                , userPassword = Nothing
-                }
+            Nothing -> Authenticated <$> (insert $ makeUser creds)
+                where makeUser creds = case getResp creds of
+                          Just resp -> User
+                              { userIdent = credsIdent creds
+                              , userName = fromMaybe (autoname creds) $ name resp
+                              , userEmail = email resp
+                              , userPic = picture resp
+                              }
+                          Nothing -> User   -- should never happen
+                              { userIdent = credsIdent creds
+                              , userName = autoname creds
+                              , userEmail = "example@example.com"
+                              , userPic = Nothing
+                              }
+                      getResp = decode . fromStrict . TE.encodeUtf8 . fromMaybe "{}" . lookup "userResponse" . credsExtra
+                      autoname = ("user"++) . drop 11 . credsIdent
+
 
     -- You can add other plugins like Google Email, email or OAuth here
     authPlugins :: App -> [AuthPlugin App]

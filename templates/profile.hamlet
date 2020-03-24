@@ -1,2 +1,14 @@
-<p>
-    you are #{userIdent user}
+<p>you are #{userIdent user}
+
+<p>your name is #{userName user}
+
+<p>your email is #{userEmail user}
+
+$case userPic user
+    $of Just pic
+        <p>
+            you have a picture: #
+            <img src=#{pic}>
+    $of Nothing
+        <p>
+            you have no picture
