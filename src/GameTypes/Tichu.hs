@@ -7,8 +7,10 @@ module GameTypes.Tichu
     , TichuBet(..)
     , TichuStatus(..)
     , TichuCard(..)
-    , TichuMsg(TMGeneric, TMSatDown, TMPickedUp, TMMadeBet, TMPassed, TMPlayed, TMGaveDragon)
+    , TichuMsgIn(TMIGeneric, TMISatDown, TMIPickedUp, TMIMadeBet, TMIPassed, TMIPlayed, TMIGaveDragon, TMIReadyToStart, TMIPassesFinished)
     , TichuMsgOut(TMOSatDown, TMOPassed)
+    , TichuMsg(TMWrapper)
+    , encodeMsg
     ) where
 
 import Database.Persist.TH
@@ -17,7 +19,10 @@ import ClassyPrelude.Yesod
 import Prelude ()
 
 import GameTypes.Generic
+import Data.HashMap.Strict as M
+import Data.Aeson
 import Data.Aeson.TH
+import qualified Data.Scientific as S
 
 data TichuSeat = Head1 | Side1 | Head2 | Side2 deriving (Generic, FromJSON, ToJSON, Enum)
 
@@ -68,17 +73,25 @@ instance PersistField TichuCard where
 instance PersistFieldSql TichuCard where
     sqlType _ = SqlInt32
 
-data TichuMsg = TMGeneric    { msg :: GenericMsg }
-              | TMSatDown    { seat :: TichuSeat, uid :: Int64 }
-              | TMPickedUp   { seat :: TichuSeat }
-              | TMMadeBet    { seat :: TichuSeat, bet :: TichuBet }
-              | TMPassed     { seat :: TichuSeat, left :: TichuCard, across :: TichuCard, right :: TichuCard }
-              | TMPlayed     { seat :: TichuSeat, cards :: [TichuCard] }
-              | TMGaveDragon { seat :: TichuSeat, recip :: TichuSeat }
-              | TMReadyToStart
-              | TMPassesFinished
-              deriving (Generic, FromJSON, ToJSON)
+data TichuMsgIn = TMIGeneric    { imsg :: GenericMsg }
+                | TMISatDown    { iseat :: TichuSeat }
+                | TMIPickedUp
+                | TMIMadeBet    { ibet :: TichuBet }
+                | TMIPassed     { ileft :: TichuCard, iacross :: TichuCard, iright :: TichuCard }
+                | TMIPlayed     { icards :: [TichuCard] }
+                | TMIGaveDragon { irecip :: TichuSeat }
+                | TMIReadyToStart
+                | TMIPassesFinished
+$(deriveJSON defaultOptions{fieldLabelModifier = drop 1, constructorTagModifier = drop 3, sumEncoding = ObjectWithSingleField} ''TichuMsgIn)
 
-data TichuMsgOut = TMOSatDown { oseat :: TichuSeat, ouid :: Int64, oname :: Text }
-                 | TMOPassed  { oseat :: TichuSeat }
+data TichuMsgOut = TMOSatDown { oseat :: TichuSeat, oname :: Text }
+                 | TMOPassed
 $(deriveJSON defaultOptions{fieldLabelModifier = drop 1} ''TichuMsgOut)
+
+data TichuMsg = TMWrapper { uid :: Int64, msg :: TichuMsgIn }
+
+encodeMsg :: ToJSON a => Int64 -> a -> LByteString
+encodeMsg uid msg = encode $
+    case toJSON msg of
+      Object o -> Object $ M.insert "uid" (Number $ S.scientific (fromIntegral uid) 0) o
+      _ -> Null

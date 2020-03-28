@@ -21,7 +21,7 @@ instance PathPiece GameType where
 data GameState = Waiting | Playing | Finished deriving (Show, Read, Eq)
 derivePersistField "GameState"
 
-data GenericMsg = PlayerHere  { uid :: Int64 }
-                | ChatMessage { uid :: Int64, msg :: Text }
-                | PlayerGone  { uid :: Int64 }
+data GenericMsg = PlayerHere
+                | ChatMessage { msg :: Text }
+                | PlayerGone
                 deriving (Generic, FromJSON, ToJSON)
