@@ -12,12 +12,14 @@ import Yesod.WebSockets
 import qualified StmContainers.Map as SM
 import Data.Function ((&))
 
+liftDB = liftHandler . runDB
+getPlayer gid uid = fmap entityVal <$>
+    selectFirst [TichuPlayerTichuGameId ==. gid, TichuPlayerUserId ==. uid] []
+
 handleGeneric :: UserId -> GenericMsg -> WebSocketsT Handler ()
 handleGeneric uid PlayerHere = sendTextData ("foo" :: ByteString)
 handleGeneric uid (ChatMessage msg) = sendTextData msg
 handleGeneric uid PlayerGone = sendTextData ("baz" :: ByteString)
-
-liftDB = liftHandler . runDB
 
 tmWrap :: UserId -> TichuMsgIn -> TichuMsg
 tmWrap = TMWrapper . fromSqlKey
@@ -33,6 +35,14 @@ beginTichuGame gid = do
             , TichuPlayerSeat ==. seat
             ] [TichuPlayerHand =. (take 14 . drop (14*fromEnum seat) $ deck)]
               | seat <- [minBound..maxBound]]
+
+readyToStartHandler :: TichuGameId -> Maybe UserId -> WebSocketsT Handler ()
+
+readyToStartHandler gid (Just uid) =
+    liftDB (getPlayer gid uid) >>=
+    traverse_ (sendTextData . encode . TMOStartingHand . tichuPlayerHand)
+
+readyToStartHandler _ _ = return ()
 
 tichuAppHandler ::
     TChan TichuMsg -> TChan TichuMsg ->
@@ -86,6 +96,7 @@ tichuApp gid = do
               TMISatDown seat -> uid' & liftDB . get >>=
                   sendTextData . encodeMsg uid . TMOSatDown seat . maybe "???" userName
               TMIPassed _ _ _ -> sendTextData $ encodeMsg uid TMOPassed
+              TMIReadyToStart -> readyToStartHandler gid' muser'
               _ -> sendTextData $ encodeMsg uid msg
             return ()
         )

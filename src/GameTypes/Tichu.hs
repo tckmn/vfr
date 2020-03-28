@@ -8,7 +8,7 @@ module GameTypes.Tichu
     , TichuStatus(..)
     , TichuCard(..)
     , TichuMsgIn(TMIGeneric, TMISatDown, TMIPickedUp, TMIMadeBet, TMIPassed, TMIPlayed, TMIGaveDragon, TMIReadyToStart, TMIPassesFinished)
-    , TichuMsgOut(TMOSatDown, TMOPassed)
+    , TichuMsgOut(TMOSatDown, TMOPassed, TMOStartingHand)
     , TichuMsg(TMWrapper)
     , encodeMsg
     ) where
@@ -73,12 +73,12 @@ instance PersistField TichuCard where
 instance PersistFieldSql TichuCard where
     sqlType _ = SqlInt32
 
-data TichuMsgIn = TMIGeneric    { imsg :: GenericMsg }
-                | TMISatDown    { iseat :: TichuSeat }
+data TichuMsgIn = TMIGeneric { imsg :: GenericMsg }
+                | TMISatDown { iseat :: TichuSeat }
                 | TMIPickedUp
-                | TMIMadeBet    { ibet :: TichuBet }
-                | TMIPassed     { ileft :: TichuCard, iacross :: TichuCard, iright :: TichuCard }
-                | TMIPlayed     { icards :: [TichuCard] }
+                | TMIMadeBet { ibet :: TichuBet }
+                | TMIPassed { ileft :: TichuCard, iacross :: TichuCard, iright :: TichuCard }
+                | TMIPlayed { icards :: [TichuCard] }
                 | TMIGaveDragon { irecip :: TichuSeat }
                 | TMIReadyToStart
                 | TMIPassesFinished
@@ -86,7 +86,8 @@ $(deriveJSON defaultOptions{fieldLabelModifier = drop 1, constructorTagModifier 
 
 data TichuMsgOut = TMOSatDown { oseat :: TichuSeat, oname :: Text }
                  | TMOPassed
-$(deriveJSON defaultOptions{fieldLabelModifier = drop 1} ''TichuMsgOut)
+                 | TMOStartingHand { ocards :: [TichuCard] }
+$(deriveJSON defaultOptions{fieldLabelModifier = drop 1, constructorTagModifier = drop 3, sumEncoding = ObjectWithSingleField} ''TichuMsgOut)
 
 data TichuMsg = TMWrapper { uid :: Int64, msg :: TichuMsgIn }
 
