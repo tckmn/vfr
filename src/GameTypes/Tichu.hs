@@ -24,7 +24,7 @@ import Data.Aeson
 import Data.Aeson.TH
 import qualified Data.Scientific as S
 
-data TichuSeat = Head1 | Side1 | Head2 | Side2 deriving (Generic, FromJSON, ToJSON, Enum)
+data TichuSeat = Head1 | Side1 | Head2 | Side2 deriving (Generic, FromJSON, ToJSON, Enum, Bounded)
 
 instance PersistField TichuSeat where
     toPersistValue = PersistInt64 . fromIntegral . fromEnum
@@ -51,7 +51,7 @@ instance PersistField TichuStatus where
 instance PersistFieldSql TichuStatus where
     sqlType _ = SqlInt32
 
-data TichuSuit = Jade | Pagoda | Star | Sword deriving (Generic, FromJSON, ToJSON, Enum)
+data TichuSuit = Jade | Pagoda | Star | Sword deriving (Generic, FromJSON, ToJSON, Enum, Bounded)
 data TichuCard = NumberCard TichuSuit Int | Dog | Dragon | Mahjong | Phoenix
     deriving (Generic, FromJSON, ToJSON)
 
