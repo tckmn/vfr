@@ -8,7 +8,7 @@ module GameTypes.Tichu
     , TichuStatus(..)
     , TichuCard(..)
     , TichuMsgIn(TMIGeneric, TMISatDown, TMIPickedUp, TMIMadeBet, TMIPassed, TMIPlayed, TMIGaveDragon, TMIReadyToStart, TMIPassesFinished)
-    , TichuMsgOut(TMOSatDown, TMOPassed, TMOStartingHand)
+    , TichuMsgOut(TMOSatDown, TMOPassed, TMOCards)
     , TichuMsg(TMWrapper)
     , encodeMsg
     ) where
@@ -86,7 +86,7 @@ $(deriveJSON defaultOptions{fieldLabelModifier = drop 1, constructorTagModifier 
 
 data TichuMsgOut = TMOSatDown { oseat :: TichuSeat, oname :: Text }
                  | TMOPassed
-                 | TMOStartingHand { ocards :: [TichuCard] }
+                 | TMOCards { ocards :: [TichuCard] }
 $(deriveJSON defaultOptions{fieldLabelModifier = drop 1, constructorTagModifier = drop 3, sumEncoding = ObjectWithSingleField} ''TichuMsgOut)
 
 data TichuMsg = TMWrapper { uid :: Int64, msg :: TichuMsgIn }

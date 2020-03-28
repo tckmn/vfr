@@ -13,8 +13,7 @@ import qualified StmContainers.Map as SM
 import Data.Function ((&))
 
 liftDB = liftHandler . runDB
-getPlayer gid uid = fmap entityVal <$>
-    selectFirst [TichuPlayerTichuGameId ==. gid, TichuPlayerUserId ==. uid] []
+player gid uid = [TichuPlayerTichuGameId ==. gid, TichuPlayerUserId ==. uid]
 
 handleGeneric :: UserId -> GenericMsg -> WebSocketsT Handler ()
 handleGeneric uid PlayerHere = sendTextData ("foo" :: ByteString)
@@ -29,7 +28,7 @@ beginTichuGame gid = do
     deck <- liftIO . shuffle $
         [NumberCard suit n | suit <- [minBound..maxBound], n <- [2..14]] ++
         [Dog, Dragon, Mahjong, Phoenix]
-    liftDB $ foldr (>>) (return ()) [do
+    liftDB $ sequence_ [do
         updateWhere
             [ TichuPlayerTichuGameId ==. gid
             , TichuPlayerSeat ==. seat
@@ -39,8 +38,8 @@ beginTichuGame gid = do
 readyToStartHandler :: TichuGameId -> Maybe UserId -> WebSocketsT Handler ()
 
 readyToStartHandler gid (Just uid) =
-    liftDB (getPlayer gid uid) >>=
-    traverse_ (sendTextData . encode . TMOStartingHand . tichuPlayerHand)
+    liftDB (selectFirst (player gid uid) []) >>=
+    traverse_ (sendTextData . encode . TMOCards . take 8 . tichuPlayerHand . entityVal)
 
 readyToStartHandler _ _ = return ()
 
@@ -60,10 +59,21 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMISatDown seat)) =
                insert (TichuPlayer uid gid seat Pickednt [] [] Nothing)
                selectList [TichuPlayerTichuGameId ==. gid] []
            atomically . writeTChan writeChan $ tmWrap uid msg
-           if length players == 4
-              then do beginTichuGame gid
-                      atomically . writeTChan writeChan $ tmWrap uid TMIReadyToStart
-              else return ()
+           when (length players == 4) $ do
+               beginTichuGame gid
+               atomically . writeTChan writeChan $ tmWrap uid TMIReadyToStart
+
+tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPickedUp)) = do
+    res <- liftDB $ do
+        res <- updateWhereCount
+            (player gid uid ++ [TichuPlayerStatus ==. Pickednt])
+            [TichuPlayerStatus =. Picked]
+        if res == 1
+           then selectFirst (player gid uid) []
+           else return Nothing
+    for_ res $
+        (sendTextData . encode . TMOCards . drop 8 . tichuPlayerHand . entityVal) >=>
+        (pure $ atomically . writeTChan writeChan $ tmWrap uid msg)
 
 -- parse failure, unauthenticated, or similar
 tichuAppHandler _ _ _ _ _ = return ()
@@ -98,7 +108,6 @@ tichuApp gid = do
               TMIPassed _ _ _ -> sendTextData $ encodeMsg uid TMOPassed
               TMIReadyToStart -> readyToStartHandler gid' muser'
               _ -> sendTextData $ encodeMsg uid msg
-            return ()
         )
         (runConduit $ sourceWS .| mapM_C (tichuAppHandler writeChan readChan gid' muser' . decode))
 
