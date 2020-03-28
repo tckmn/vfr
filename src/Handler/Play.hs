@@ -64,16 +64,30 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMISatDown seat)) =
                atomically . writeTChan writeChan $ tmWrap uid TMIReadyToStart
 
 tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPickedUp)) = do
-    res <- liftDB $ do
+    playerWhoPicked <- liftDB $ do
         res <- updateWhereCount
             (player gid uid ++ [TichuPlayerStatus ==. Pickednt])
             [TichuPlayerStatus =. Picked]
         if res == 1
            then selectFirst (player gid uid) []
            else return Nothing
-    for_ res $
+    for_ playerWhoPicked $
         (sendTextData . encode . TMOCards . drop 8 . tichuPlayerHand . entityVal) >=>
         (pure $ atomically . writeTChan writeChan $ tmWrap uid msg)
+
+tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIMadeBet bet)) = do
+    isValid <- liftDB $ do
+        mplayer <- selectFirst (player gid uid) []
+        case mplayer of
+          Just (Entity pid p) -> do
+              let isValid =
+                      tichuPlayerStatus p == Pickednt ||
+                      (bet == Tichued && tichuPlayerStatus p == Picked &&
+                          length (tichuPlayerHand p) == 14)
+              when isValid $ update pid [TichuPlayerStatus =. MadeBet bet]
+              return isValid
+          Nothing -> return False
+    when isValid $ atomically . writeTChan writeChan $ tmWrap uid msg
 
 -- parse failure, unauthenticated, or similar
 tichuAppHandler _ _ _ _ _ = return ()

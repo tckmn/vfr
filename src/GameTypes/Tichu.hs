@@ -34,8 +34,8 @@ instance PersistField TichuSeat where
 instance PersistFieldSql TichuSeat where
     sqlType _ = SqlInt32
 
-data TichuBet = Tichued | Granded deriving (Generic, FromJSON, ToJSON)
-data TichuStatus = Pickednt | Picked | MadeBet TichuBet
+data TichuBet = Tichued | Granded deriving (Eq, Generic, FromJSON, ToJSON)
+data TichuStatus = Pickednt | Picked | MadeBet TichuBet deriving (Eq)
 
 instance PersistField TichuStatus where
     toPersistValue Pickednt          = PersistInt64 0
