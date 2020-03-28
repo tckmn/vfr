@@ -41,9 +41,8 @@ tichuAppHandler ::
 
 tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMISatDown seat)) = do
     existing <- liftDB $ selectFirst
-        [ TichuPlayerTichuGameId ==. gid
-        , TichuPlayerSeat ==. seat
-        ] []
+        ([TichuPlayerTichuGameId ==. gid] ++
+         ([TichuPlayerSeat ==. seat] ||. [TichuPlayerUserId ==. uid])) []
     if isJust existing
        then sendTextData ("Someone's already sitting there!" :: Text)
        else do
