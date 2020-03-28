@@ -1,5 +1,4 @@
--- By default this file is used by `persistFileWith` in Model.hs (which is imported by Foundation.hs)
--- Syntax for this file here: https://github.com/yesodweb/persistent/blob/master/docs/Persistent-entity-syntax.md
+-- https://github.com/yesodweb/persistent/blob/master/docs/Persistent-entity-syntax.md
 
 User
     ident Text
@@ -8,6 +7,25 @@ User
     pic Text Maybe
     UniqueUser ident
     deriving Typeable
+
+Game
+    gtype GameType
+    subid Int64
+    state GameState
+    players Int64
+
+TichuGame
+    turn TichuSeat
+    board ByteString
+
+TichuPlayer
+    userId UserId
+    tichuGameId TichuGameId
+    seat TichuSeat
+    status TichuStatus
+    hand [TichuCard]
+    pile [TichuCard]
+    passes [TichuCard] Maybe
 
 Comment json
     message Text

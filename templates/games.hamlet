@@ -1,0 +1,13 @@
+<form #newgame method=post action=@{GamesR} enctype=#{enctype}>
+    ^{widget}
+    <button>create new game
+
+$if null gamesList
+    <p>no active games
+$else
+    <ul #gameslist>
+        $forall Entity _ (Game gtype subid state players) <- gamesList
+            <li>
+                <a href=@{PlayR gtype subid}>
+                    #{show $ gtype}
+                (#{show $ state}, #{show $ players} players)

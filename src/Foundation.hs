@@ -30,6 +30,8 @@ import qualified Data.Text.Encoding as TE
 
 import GHC.Generics
 
+import qualified StmContainers.Map as SM
+
 -- | The foundation datatype for your application. This can be a good place to
 -- keep settings and values requiring initialization before your application
 -- starts running, such as database connections. Every handler will have
@@ -40,6 +42,7 @@ data App = App
     , appConnPool    :: ConnectionPool -- ^ Database connection pool.
     , appHttpManager :: Manager
     , appLogger      :: Logger
+    , appTichuChans  :: SM.Map Int64 (TChan TichuMsg)
     }
 
 data MenuItem = MenuItem
@@ -113,6 +116,7 @@ instance Yesod App where
         let menuItems =
                 [ MenuItem "home" HomeR
                 , MenuItem "profile" ProfileR
+                , MenuItem "games" GamesR
                 ]
 
         let authItem = case muser of
@@ -140,17 +144,19 @@ instance Yesod App where
         :: Route App  -- ^ The route the user is visiting.
         -> Bool       -- ^ Whether or not this is a "write" request.
         -> Handler AuthResult
-    -- Routes not requiring authentication.
-    isAuthorized (AuthR _) _ = return Authorized
-    isAuthorized CommentR _ = return Authorized
-    isAuthorized HomeR _ = return Authorized
-    isAuthorized FaviconR _ = return Authorized
-    isAuthorized RobotsR _ = return Authorized
-    isAuthorized (StaticR _) _ = return Authorized
 
-    -- the profile route requires that the user is authenticated, so we
-    -- delegate to that function
+    isAuthorized (AuthR _)   _ = return Authorized
+    isAuthorized CommentR    _ = return Authorized
+    isAuthorized HomeR       _ = return Authorized
+    isAuthorized FaviconR    _ = return Authorized
+    isAuthorized RobotsR     _ = return Authorized
+    isAuthorized (StaticR _) _ = return Authorized
+    isAuthorized (PlayR _ _) _ = return Authorized
+
     isAuthorized ProfileR _ = isAuthenticated
+
+    isAuthorized GamesR False = return Authorized
+    isAuthorized GamesR True  = isAuthenticated
 
     -- This function creates static content files in the static folder
     -- and names them based on a hash of their content. This allows
@@ -248,7 +254,7 @@ isAuthenticated :: Handler AuthResult
 isAuthenticated = do
     muid <- maybeAuthId
     return $ case muid of
-        Nothing -> Unauthorized "You must login to access this page"
+        Nothing -> Unauthorized "you have to log in to do that"
         Just _ -> Authorized
 
 instance YesodAuthPersist App

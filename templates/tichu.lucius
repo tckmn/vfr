@@ -1,0 +1,8 @@
+table#square {
+    border-spacing: border-collapse;
+    text-align: center;
+    td#board { width: 50%; background-color: red; }
+    td.player { width: 25%; }
+    td.headpad { padding-bottom: 25%; }
+    td.sidepad { padding-bottom: 50%; }
+}

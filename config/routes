@@ -12,3 +12,7 @@
 /comments CommentR POST
 
 /profile ProfileR GET
+
+/games GamesR GET POST
+
+/play/#GameType/#Int64 PlayR GET

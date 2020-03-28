@@ -1,0 +1,24 @@
+<table #square>
+    <tr>
+        <td .headpad>
+        <td .player #h1>
+            <img src=@{StaticR img_unk_svg}>
+            <p><strong>waiting for player</strong>
+            <p>
+    <tr>
+        <td .player #s2>
+            <img src=@{StaticR img_unk_svg}>
+            <p><strong>waiting for player</strong>
+            <p>
+        <td #board>
+        <td .player #s1>
+            <img src=@{StaticR img_unk_svg}>
+            <p><strong>waiting for player</strong>
+            <p>
+        <td .sidepad>
+    <tr>
+        <td .headpad>
+        <td .player #h2>
+            <img src=@{StaticR img_unk_svg}>
+            <p><strong>waiting for player</strong>
+            <p>

@@ -5,7 +5,7 @@ $doctype 5
   <head>
     <meta charset="UTF-8">
 
-    <title>#{pageTitle pc}
+    <title>vfr - #{pageTitle pc}
     <meta name="description" content="">
     <meta name="author" content="">
 
