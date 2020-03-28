@@ -15,7 +15,7 @@ Game
     players Int64
 
 TichuGame
-    turn TichuSeat
+    turn TichuSeat Maybe
     board ByteString
 
 TichuPlayer
@@ -25,7 +25,7 @@ TichuPlayer
     status TichuStatus
     hand [TichuCard]
     pile [TichuCard]
-    passes [TichuCard] Maybe
+    passes TichuCardTrio Maybe
 
 Comment json
     message Text

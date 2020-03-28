@@ -6,23 +6,23 @@ module GameTypes.Tichu
     ( TichuSeat(..)
     , TichuBet(..)
     , TichuStatus(..)
-    , TichuCard(..)
+    , TichuCard(..), TichuCardTrio
     , TichuMsgIn(TMIGeneric, TMISatDown, TMIPickedUp, TMIMadeBet, TMIPassed, TMIPlayed, TMIGaveDragon, TMIReadyToStart, TMIPassesFinished)
     , TichuMsgOut(TMOSatDown, TMOPassed, TMOCards)
     , TichuMsg(TMWrapper)
     , encodeMsg
     ) where
 
-import Database.Persist.TH
-import Database.Persist.Sql
 import ClassyPrelude.Yesod
 import Prelude ()
-
-import GameTypes.Generic
-import Data.HashMap.Strict as M
+import Database.Persist.TH
+import Database.Persist.Sql
+import qualified Data.Scientific as S
 import Data.Aeson
 import Data.Aeson.TH
-import qualified Data.Scientific as S
+import Data.HashMap.Strict as M
+import Tools
+import GameTypes.Generic
 
 data TichuSeat = Head1 | Side1 | Head2 | Side2 deriving (Generic, FromJSON, ToJSON, Enum, Bounded)
 
@@ -51,9 +51,10 @@ instance PersistField TichuStatus where
 instance PersistFieldSql TichuStatus where
     sqlType _ = SqlInt32
 
-data TichuSuit = Jade | Pagoda | Star | Sword deriving (Generic, FromJSON, ToJSON, Enum, Bounded)
+data TichuSuit = Jade | Pagoda | Star | Sword deriving (Eq, Generic, FromJSON, ToJSON, Enum, Bounded)
 data TichuCard = NumberCard TichuSuit Int | Dog | Dragon | Mahjong | Phoenix
-    deriving (Generic, FromJSON, ToJSON)
+    deriving (Eq, Generic, FromJSON, ToJSON)
+type TichuCardTrio = Trio TichuCard
 
 instance PersistField TichuCard where
     toPersistValue (NumberCard s v) = PersistInt64 . fromIntegral $ 15*fromEnum s + v

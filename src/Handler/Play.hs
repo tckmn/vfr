@@ -35,13 +35,43 @@ beginTichuGame gid = do
             ] [TichuPlayerHand =. (take 14 . drop (14*fromEnum seat) $ deck)]
               | seat <- [minBound..maxBound]]
 
-readyToStartHandler :: TichuGameId -> Maybe UserId -> WebSocketsT Handler ()
+resolvePasses :: MonadIO m => TichuGameId -> ReaderT SqlBackend m ()
+resolvePasses gid = do
+    mhead1 <- selectFirst [TichuPlayerTichuGameId ==. gid, TichuPlayerSeat ==. Head1] []
+    mside1 <- selectFirst [TichuPlayerTichuGameId ==. gid, TichuPlayerSeat ==. Side1] []
+    mhead2 <- selectFirst [TichuPlayerTichuGameId ==. gid, TichuPlayerSeat ==. Head2] []
+    mside2 <- selectFirst [TichuPlayerTichuGameId ==. gid, TichuPlayerSeat ==. Side2] []
+    -- none of this garbage should ever be Nothing, so we ignore everything if it is
+    -- (probably better to log an error or something but whatever)
+    sequence_ $ do
+        Entity h1id h1 <- mhead1
+        Entity s1id s1 <- mside1
+        Entity h2id h2 <- mhead2
+        Entity s2id s2 <- mside2
+        h1p <- tichuPlayerPasses h1
+        s1p <- tichuPlayerPasses s1
+        h2p <- tichuPlayerPasses h2
+        s2p <- tichuPlayerPasses s2
+        let h1h = tfst s2p:tsnd h2p:thrd s1p:[c | c <- tichuPlayerHand h1, all (c /=) h1p]
+            s1h = tfst h1p:tsnd s2p:thrd h2p:[c | c <- tichuPlayerHand s1, all (c /=) s1p]
+            h2h = tfst s1p:tsnd h1p:thrd s2p:[c | c <- tichuPlayerHand h2, all (c /=) h2p]
+            s2h = tfst h2p:tsnd s1p:thrd h1p:[c | c <- tichuPlayerHand s2, all (c /=) s2p]
+            gofirst =
+                if Mahjong `elem` h1h then Head1 else
+                if Mahjong `elem` s1h then Side1 else
+                if Mahjong `elem` h2h then Head2 else Side2
+        return $ do
+            update h1id [TichuPlayerHand =. h1h]
+            update s1id [TichuPlayerHand =. s1h]
+            update h2id [TichuPlayerHand =. h2h]
+            update s2id [TichuPlayerHand =. s2h]
+            update gid [TichuGameTurn =. Just gofirst]
 
-readyToStartHandler gid (Just uid) =
+revealCardsHandler :: Int -> TichuGameId -> Maybe UserId -> WebSocketsT Handler ()
+revealCardsHandler n gid (Just uid) =
     liftDB (selectFirst (player gid uid) []) >>=
-    traverse_ (sendTextData . encode . TMOCards . take 8 . tichuPlayerHand . entityVal)
-
-readyToStartHandler _ _ = return ()
+    traverse_ (sendTextData . encode . TMOCards . take n . tichuPlayerHand . entityVal)
+revealCardsHandler _ _ _ = return ()
 
 tichuAppHandler ::
     TChan TichuMsg -> TChan TichuMsg ->
@@ -72,7 +102,7 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPickedUp)) = do
            then selectFirst (player gid uid) []
            else return Nothing
     for_ playerWhoPicked $
-        (sendTextData . encode . TMOCards . drop 8 . tichuPlayerHand . entityVal) >=>
+        (sendTextData . encode . TMOCards . tichuPlayerHand . entityVal) >=>
         (pure $ atomically . writeTChan writeChan $ tmWrap uid msg)
 
 tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIMadeBet bet)) = do
@@ -88,6 +118,34 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIMadeBet bet)) = 
               return isValid
           Nothing -> return False
     when isValid $ atomically . writeTChan writeChan $ tmWrap uid msg
+
+tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPassed left across right)) = do
+    mshouldStart <- liftDB $ do
+        mplayer <- selectFirst (player gid uid) []
+        case mplayer of
+          Just (Entity pid p) -> do
+              let isValid = and
+                      [ isNothing $ tichuPlayerPasses p
+                      , left /= across
+                      , across /= right
+                      , left /= right
+                      , left `elem` tichuPlayerHand p
+                      , across `elem` tichuPlayerHand p
+                      , right `elem` tichuPlayerHand p
+                      ]
+              if isValid
+                 then do
+                     update pid [TichuPlayerPasses =. Just (Trio left across right)]
+                     passed <- selectList
+                        [TichuPlayerTichuGameId ==. gid, TichuPlayerPasses !=. Nothing] []
+                     if length passed == 4
+                        then resolvePasses gid >> return (Just True)
+                        else return (Just False)
+                 else return Nothing
+          Nothing -> return Nothing
+    for_ mshouldStart $ \shouldStart -> atomically $ do
+        writeTChan writeChan $ tmWrap uid msg
+        when shouldStart $ writeTChan writeChan $ tmWrap uid TMIPassesFinished
 
 -- parse failure, unauthenticated, or similar
 tichuAppHandler _ _ _ _ _ = return ()
@@ -120,7 +178,8 @@ tichuApp gid = do
               TMISatDown seat -> uid' & liftDB . get >>=
                   sendTextData . encodeMsg uid . TMOSatDown seat . maybe "???" userName
               TMIPassed _ _ _ -> sendTextData $ encodeMsg uid TMOPassed
-              TMIReadyToStart -> readyToStartHandler gid' muser'
+              TMIReadyToStart -> revealCardsHandler 8 gid' muser'
+              TMIPassesFinished -> revealCardsHandler 14 gid' muser'
               _ -> sendTextData $ encodeMsg uid msg
         )
         (runConduit $ sourceWS .| mapM_C (tichuAppHandler writeChan readChan gid' muser' . decode))
