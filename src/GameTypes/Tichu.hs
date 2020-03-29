@@ -6,7 +6,7 @@ module GameTypes.Tichu
     ( TichuSeat(..)
     , TichuBet(..)
     , TichuStatus(..)
-    , TichuSuit(..), TichuCard(..), TichuCardTrio
+    , TichuSuit(..), TichuCard(..), TichuCardTrio, TichuCardList
     , TichuMsgIn(TMIGeneric, TMISatDown, TMIPickedUp, TMIMadeBet, TMIPassed, TMIPlayed, TMIGaveDragon, TMIReadyToStart, TMIPassesFinished)
     , TichuMsgOut(TMOSatDown, TMOPassed, TMOCards)
     , TichuMsg(TMWrapper)
@@ -24,7 +24,7 @@ import Data.HashMap.Strict as M
 import Tools
 import GameTypes.Generic
 
-data TichuSeat = Head1 | Side1 | Head2 | Side2 deriving (Generic, FromJSON, ToJSON, Enum, Bounded)
+data TichuSeat = Head1 | Side1 | Head2 | Side2 deriving (Eq, Generic, FromJSON, ToJSON, Enum, Bounded)
 
 instance PersistField TichuSeat where
     toPersistValue = PersistInt64 . fromIntegral . fromEnum
@@ -55,20 +55,16 @@ data TichuSuit = Jade | Pagoda | Star | Sword deriving (Eq, Ord, Generic, FromJS
 data TichuCard = NumberCard TichuSuit Int | Dog | Dragon | Mahjong | Phoenix
     deriving (Eq, Generic, FromJSON, ToJSON)
 type TichuCardTrio = Trio TichuCard
+type TichuCardList = [TichuCard]
 
 instance Ord TichuCard where
     -- phoenix comes first for convenience in matching plays
-    -- (then we might as well reverse alphabetize the rest lol)
-    compare Phoenix _ = LT
-    compare _ Phoenix = GT
-    compare Mahjong _ = LT
-    compare _ Mahjong = GT
-    compare Dragon _ = LT
-    compare _ Dragon = GT
-    compare Dog _ = LT
-    compare _ Dog = GT
-    -- then we sort by value (again for convenience in matching)
-    compare (NumberCard s v) (NumberCard s' v') = compare v v' <> compare s s'
+    compare = compare `on` numeralize
+        where numeralize Phoenix = 0
+              numeralize Dog = 1
+              numeralize Mahjong = 1
+              numeralize (NumberCard _ v) = v
+              numeralize Dragon = 15
 
 instance PersistField TichuCard where
     toPersistValue (NumberCard s v) = PersistInt64 . fromIntegral $ 15*fromEnum s + v

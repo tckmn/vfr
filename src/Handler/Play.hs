@@ -29,42 +29,49 @@ data TichuPlay = Singl TichuCard
                | Tractor Int Int
                | Bomb Int Int
 
--- takes sorted list of cards
 resolvePlay :: [TichuCard] -> Maybe TichuPlay
+resolvePlay cards
+  | any (/=1) counts = Nothing
+  | otherwise        = resolvePlay' sorted
+  where sorted = sort cards
+        counts = length <$> group sorted
 
-resolvePlay [] = Nothing
-resolvePlay [a] = Just $ Singl a
+-- helper function that takes sorted list of unique cards
+resolvePlay' :: [TichuCard] -> Maybe TichuPlay
 
-resolvePlay [NumberCard _ n, NumberCard _ n']
+resolvePlay' [] = Nothing
+resolvePlay' [a] = Just $ Singl a
+
+resolvePlay' [NumberCard _ n, NumberCard _ n']
   | n == n'   = Just $ Pair n
   | otherwise = Nothing
-resolvePlay [Phoenix, NumberCard _ n] = Just $ Pair n
-resolvePlay [_, _] = Nothing
+resolvePlay' [Phoenix, NumberCard _ n] = Just $ Pair n
+resolvePlay' [_, _] = Nothing
 
-resolvePlay [NumberCard _ n, NumberCard _ n', NumberCard _ n'']
+resolvePlay' [NumberCard _ n, NumberCard _ n', NumberCard _ n'']
   | n == n' && n' == n'' = Just $ Triple n
   | otherwise            = Nothing
-resolvePlay [Phoenix, NumberCard _ n, NumberCard _ n']
+resolvePlay' [Phoenix, NumberCard _ n, NumberCard _ n']
   | n == n'   = Just $ Triple n
   | otherwise = Nothing
-resolvePlay [_, _, _] = Nothing
+resolvePlay' [_, _, _] = Nothing
 
 -- handle this case explicitly because of bombs
-resolvePlay [NumberCard _ n, NumberCard _ n', NumberCard _ n'', NumberCard _ n''']
+resolvePlay' [NumberCard _ n, NumberCard _ n', NumberCard _ n'', NumberCard _ n''']
   | n == n' && n' == n'' && n'' == n'''   = Just $ Bomb 4 n
   | n == n' && n'' == n''' && n+1 == n'' = Just $ Tractor 2 n
   | otherwise = Nothing
-resolvePlay [_, _, _, _] = Nothing
+resolvePlay' [_, _, _, _] = Nothing
 
 -- with the phoenix, we make it a different suit from another card to avoid making bombs
 -- TODO: maybe we should let players decide what the phoenix is when ambiguous
 -- (for now, it acts as the highest legal value, which is usually what you want)
-resolvePlay (Phoenix:xs@(x0:_)) =
-    asum [resolvePlay $ (NumberCard freeSuit n):xs | n <- [14,13..2]]
+resolvePlay' (Phoenix:xs@(x0:_)) =
+    asum [resolvePlay' $ (NumberCard freeSuit n):xs | n <- [14,13..2]]
         where freeSuit = case x0 of NumberCard Jade _ -> Pagoda
                                     _ -> Jade
 
-resolvePlay xs@(x0':_)
+resolvePlay' xs@(x0':_)
   | length xs /= len = Nothing
   | all (==1) diffs = Just $ if length (group suits) == 1 then Bomb len x0 else Straight len x0
   | even len && and (zipWith (==) diffs (cycle [0,1])) = Just $ Tractor len x0
@@ -77,6 +84,28 @@ resolvePlay xs@(x0':_)
         unwrapNum (NumberCard s v) = Just (s, v)
         unwrapNum _ = Nothing
         cycle xs = xs' where xs' = xs ++ xs'
+
+-- the mapMaybe won't throw anything out because these are guaranteed to resolve
+canPlayOn :: [[TichuCard]] -> TichuPlay -> Bool
+canPlayOn = canPlayOn' . mapMaybe resolvePlay
+
+canPlayOn' :: [TichuPlay] -> TichuPlay -> Bool
+
+canPlayOn' [] _ = True
+
+canPlayOn' ((Singl Phoenix):[]) (Singl c')   = c' > Dog
+canPlayOn' ((Singl Phoenix):xs) c'@(Singl _) = canPlayOn' xs c'
+canPlayOn' ((Singl c):_) (Singl Phoenix)     = c /= Dragon
+
+canPlayOn' ((Singl c):_)        (Singl c')         = c' > c
+canPlayOn' ((Pair n):_)         (Pair n')          = n' > n
+canPlayOn' ((Triple n):_)       (Triple n')        = n' > n
+canPlayOn' ((FullHouse n):_)    (FullHouse n')     = n' > n
+canPlayOn' ((Straight len n):_) (Straight len' n') = len' == len && n' > n
+canPlayOn' ((Tractor len n):_)  (Tractor len' n')  = len' == len && n' > n
+canPlayOn' ((Bomb len n):_)     (Bomb len' n')     = compare len' len <> compare n' n == GT
+
+canPlayOn' _ _ = False
 
 tmWrap :: UserId -> TichuMsgIn -> TichuMsg
 tmWrap = TMWrapper . fromSqlKey
@@ -100,7 +129,7 @@ resolvePasses gid = do
     mhead2 <- selectFirst [TichuPlayerTichuGameId ==. gid, TichuPlayerSeat ==. Head2] []
     mside2 <- selectFirst [TichuPlayerTichuGameId ==. gid, TichuPlayerSeat ==. Side2] []
     -- none of this garbage should ever be Nothing, so we ignore everything if it is
-    -- (probably better to log an error or something but whatever)
+    -- (TODO: probably better to log an error or something but whatever)
     sequence_ $ do
         Entity h1id h1 <- mhead1
         Entity s1id s1 <- mside1
@@ -207,7 +236,24 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPassed left acro
         writeTChan writeChan $ tmWrap uid msg
         when shouldStart $ writeTChan writeChan $ tmWrap uid TMIPassesFinished
 
--- tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) = do
+tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) = do
+    isValid <- liftDB $ do
+        mgame <- get gid
+        mplayer <- selectFirst (player gid uid) []
+        sequence_ $ do
+            game <- mgame
+            Entity pid p <- mplayer
+            let board = tichuGameBoard game
+                hand = tichuPlayerHand p
+            guard $ all (`elem` hand) cards
+            play <- resolvePlay cards
+            guard $ canPlayOn board play
+            guard $ case play of
+                      Bomb _ _ -> isJust $ tichuGameTurn game -- lol, no pre-game bombs
+                      _ -> any (== tichuPlayerSeat p) (tichuGameTurn game)
+            return $ do
+                return ()
+    return ()
 
 -- parse failure, unauthenticated, or similar
 tichuAppHandler _ _ _ _ _ = return ()
