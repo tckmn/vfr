@@ -259,7 +259,9 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) =
         case mplay of
           Just playAction -> playAction >> return True
           Nothing -> return False
-    when isValid $ atomically . writeTChan writeChan $ tmWrap uid msg
+    if isValid
+       then atomically . writeTChan writeChan $ tmWrap uid msg
+       else sendTextData ("That's not a valid play at this time!" :: Text)
 
 -- parse failure, unauthenticated, or similar
 tichuAppHandler _ _ _ _ _ = return ()
