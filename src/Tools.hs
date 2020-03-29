@@ -40,3 +40,11 @@ instance PersistField a => PersistField (Trio a) where
 
 instance PersistField a => PersistFieldSql (Trio a) where
     sqlType _ = SqlString
+
+succ' :: (Enum a, Bounded a, Eq a) => a -> a
+succ' x | x == maxBound = minBound
+        | otherwise     = succ x
+
+pred' :: (Enum a, Bounded a, Eq a) => a -> a
+pred' x | x == minBound = maxBound
+        | otherwise     = pred x

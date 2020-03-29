@@ -240,20 +240,25 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) =
     isValid <- liftDB $ do
         mgame <- get gid
         mplayer <- selectFirst (player gid uid) []
-        sequence_ $ do
+        let mplay = do
             game <- mgame
             Entity pid p <- mplayer
             let board = tichuGameBoard game
+                turn = tichuGameTurn game
                 hand = tichuPlayerHand p
             guard $ all (`elem` hand) cards
             play <- resolvePlay cards
             guard $ canPlayOn board play
             guard $ case play of
-                      Bomb _ _ -> isJust $ tichuGameTurn game -- lol, no pre-game bombs
-                      _ -> any (== tichuPlayerSeat p) (tichuGameTurn game)
+                      Bomb _ _ -> isJust $ turn  -- lol, no pre-game bombs
+                      _ -> any (== tichuPlayerSeat p) turn
             return $ do
-                return ()
-    return ()
+                update pid [TichuPlayerHand =. [c | c <- hand, c `notElem` cards]]
+                update gid [TichuGameBoard =. (cards:board), TichuGameTurn =. succ' <$> turn]
+        case mplay of
+          Just playAction -> playAction >> return True
+          Nothing -> return False
+    when isValid $ atomically . writeTChan writeChan $ tmWrap uid msg
 
 -- parse failure, unauthenticated, or similar
 tichuAppHandler _ _ _ _ _ = return ()
