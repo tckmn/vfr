@@ -249,9 +249,10 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) =
             guard $ all (`elem` hand) cards
             play <- resolvePlay cards
             guard $ canPlayOn board play
-            guard $ case play of
-                      Bomb _ _ -> isJust $ turn  -- lol, no pre-game bombs
-                      _ -> any (== tichuPlayerSeat p) turn
+            guard $ let myturn = any (== tichuPlayerSeat p) turn in
+                        case play of
+                          Bomb _ _ -> isJust turn && (myturn || not (null board))
+                          _ -> myturn
             return $ do
                 update pid [TichuPlayerHand =. [c | c <- hand, c `notElem` cards]]
                 update gid [TichuGameBoard =. (cards:board), TichuGameTurn =. succ' <$> turn]
