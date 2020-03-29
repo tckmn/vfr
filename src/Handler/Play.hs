@@ -20,6 +20,64 @@ handleGeneric uid PlayerHere = sendTextData ("foo" :: ByteString)
 handleGeneric uid (ChatMessage msg) = sendTextData msg
 handleGeneric uid PlayerGone = sendTextData ("baz" :: ByteString)
 
+-- there's already a thing called Single, whoops
+data TichuPlay = Singl TichuCard
+               | Pair Int
+               | Triple Int
+               | FullHouse Int
+               | Straight Int Int
+               | Tractor Int Int
+               | Bomb Int Int
+
+-- takes sorted list of cards
+resolvePlay :: [TichuCard] -> Maybe TichuPlay
+
+resolvePlay [] = Nothing
+resolvePlay [a] = Just $ Singl a
+
+resolvePlay [NumberCard _ n, NumberCard _ n']
+  | n == n'   = Just $ Pair n
+  | otherwise = Nothing
+resolvePlay [Phoenix, NumberCard _ n] = Just $ Pair n
+resolvePlay [_, _] = Nothing
+
+resolvePlay [NumberCard _ n, NumberCard _ n', NumberCard _ n'']
+  | n == n' && n' == n'' = Just $ Triple n
+  | otherwise            = Nothing
+resolvePlay [Phoenix, NumberCard _ n, NumberCard _ n']
+  | n == n'   = Just $ Triple n
+  | otherwise = Nothing
+resolvePlay [_, _, _] = Nothing
+
+-- handle this case explicitly because of bombs
+resolvePlay [NumberCard _ n, NumberCard _ n', NumberCard _ n'', NumberCard _ n''']
+  | n == n' && n' == n'' && n'' == n'''   = Just $ Bomb 4 n
+  | n == n' && n'' == n''' && n+1 == n'' = Just $ Tractor 2 n
+  | otherwise = Nothing
+resolvePlay [_, _, _, _] = Nothing
+
+-- with the phoenix, we make it a different suit from another card to avoid making bombs
+-- TODO: maybe we should let players decide what the phoenix is when ambiguous
+-- (for now, it acts as the highest legal value, which is usually what you want)
+resolvePlay (Phoenix:xs@(x0:_)) =
+    asum [resolvePlay $ (NumberCard freeSuit n):xs | n <- [14,13..2]]
+        where freeSuit = case x0 of NumberCard Jade _ -> Pagoda
+                                    _ -> Jade
+
+resolvePlay xs@(x0':_)
+  | length xs /= len = Nothing
+  | all (==1) diffs = Just $ if length (group suits) == 1 then Bomb len x0 else Straight len x0
+  | even len && and (zipWith (==) diffs (cycle [0,1])) = Just $ Tractor len x0
+  | otherwise = Nothing
+  where (suits, nums) = unzip $ mapMaybe unwrapNum xs
+        len = length nums
+        diffs = zipWith (-) (drop 1 nums) nums
+        x0 = case x0' of NumberCard _ n -> n
+                         _ -> 0
+        unwrapNum (NumberCard s v) = Just (s, v)
+        unwrapNum _ = Nothing
+        cycle xs = xs' where xs' = xs ++ xs'
+
 tmWrap :: UserId -> TichuMsgIn -> TichuMsg
 tmWrap = TMWrapper . fromSqlKey
 
@@ -78,6 +136,7 @@ tichuAppHandler ::
     TichuGameId -> Maybe UserId ->
     Maybe TichuMsgIn -> WebSocketsT Handler ()
 
+-- TODO: allow players to unsit
 tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMISatDown seat)) = do
     existing <- liftDB $ selectFirst
         ([TichuPlayerTichuGameId ==. gid] ++
@@ -119,6 +178,7 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIMadeBet bet)) = 
           Nothing -> return False
     when isValid $ atomically . writeTChan writeChan $ tmWrap uid msg
 
+-- TODO: allow players to unpass
 tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPassed left across right)) = do
     mshouldStart <- liftDB $ do
         mplayer <- selectFirst (player gid uid) []
@@ -146,6 +206,8 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPassed left acro
     for_ mshouldStart $ \shouldStart -> atomically $ do
         writeTChan writeChan $ tmWrap uid msg
         when shouldStart $ writeTChan writeChan $ tmWrap uid TMIPassesFinished
+
+-- tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) = do
 
 -- parse failure, unauthenticated, or similar
 tichuAppHandler _ _ _ _ _ = return ()

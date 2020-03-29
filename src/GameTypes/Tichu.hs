@@ -6,7 +6,7 @@ module GameTypes.Tichu
     ( TichuSeat(..)
     , TichuBet(..)
     , TichuStatus(..)
-    , TichuCard(..), TichuCardTrio
+    , TichuSuit(..), TichuCard(..), TichuCardTrio
     , TichuMsgIn(TMIGeneric, TMISatDown, TMIPickedUp, TMIMadeBet, TMIPassed, TMIPlayed, TMIGaveDragon, TMIReadyToStart, TMIPassesFinished)
     , TichuMsgOut(TMOSatDown, TMOPassed, TMOCards)
     , TichuMsg(TMWrapper)
@@ -51,10 +51,24 @@ instance PersistField TichuStatus where
 instance PersistFieldSql TichuStatus where
     sqlType _ = SqlInt32
 
-data TichuSuit = Jade | Pagoda | Star | Sword deriving (Eq, Generic, FromJSON, ToJSON, Enum, Bounded)
+data TichuSuit = Jade | Pagoda | Star | Sword deriving (Eq, Ord, Generic, FromJSON, ToJSON, Enum, Bounded)
 data TichuCard = NumberCard TichuSuit Int | Dog | Dragon | Mahjong | Phoenix
     deriving (Eq, Generic, FromJSON, ToJSON)
 type TichuCardTrio = Trio TichuCard
+
+instance Ord TichuCard where
+    -- phoenix comes first for convenience in matching plays
+    -- (then we might as well reverse alphabetize the rest lol)
+    compare Phoenix _ = LT
+    compare _ Phoenix = GT
+    compare Mahjong _ = LT
+    compare _ Mahjong = GT
+    compare Dragon _ = LT
+    compare _ Dragon = GT
+    compare Dog _ = LT
+    compare _ Dog = GT
+    -- then we sort by value (again for convenience in matching)
+    compare (NumberCard s v) (NumberCard s' v') = compare v v' <> compare s s'
 
 instance PersistField TichuCard where
     toPersistValue (NumberCard s v) = PersistInt64 . fromIntegral $ 15*fromEnum s + v

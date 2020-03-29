@@ -25,7 +25,7 @@ postGamesR = do
     ((result, widget), enctype) <- runFormPost newGameForm
     case result of
       FormSuccess (NewGame gt@Tichu) -> do
-          Entity subid _ <- runDB $ insertEntity (TichuGame Nothing "")
+          Entity subid _ <- runDB $ insertEntity (TichuGame Nothing [])
           runDB $ insertEntity (Game gt (fromSqlKey subid) Waiting 0)
           getGamesR
       _ -> getGamesR
