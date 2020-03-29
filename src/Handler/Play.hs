@@ -258,7 +258,8 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) =
                           _ -> myturn
             return $ do
                 update pid [TichuPlayerHand =. [c | c <- hand, c `notElem` cards]]
-                update gid [TichuGameBoard =. (cards:board), TichuGameTurn =. succ' <$> turn]
+                update gid $ [TichuGameBoard =. (cards:board) | not $ null cards] ++
+                             [TichuGameTurn =. succ' <$> turn]
         case mplay of
           Just playAction -> playAction >> return True
           Nothing -> return False
