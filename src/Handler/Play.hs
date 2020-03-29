@@ -28,6 +28,7 @@ data TichuPlay = Singl TichuCard
                | Straight Int Int
                | Tractor Int Int
                | Bomb Int Int
+               | Pass
 
 resolvePlay :: [TichuCard] -> Maybe TichuPlay
 resolvePlay cards
@@ -39,7 +40,7 @@ resolvePlay cards
 -- helper function that takes sorted list of unique cards
 resolvePlay' :: [TichuCard] -> Maybe TichuPlay
 
-resolvePlay' [] = Nothing
+resolvePlay' [] = Just Pass
 resolvePlay' [a] = Just $ Singl a
 
 resolvePlay' [NumberCard _ n, NumberCard _ n']
@@ -91,6 +92,8 @@ canPlayOn = canPlayOn' . mapMaybe resolvePlay
 
 canPlayOn' :: [TichuPlay] -> TichuPlay -> Bool
 
+canPlayOn' [] Pass = False
+canPlayOn' _  Pass = True
 canPlayOn' [] _ = True
 
 canPlayOn' ((Singl Phoenix):[]) (Singl c')   = c' > Dog
