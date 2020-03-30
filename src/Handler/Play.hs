@@ -13,7 +13,9 @@ import qualified StmContainers.Map as SM
 import Data.Function ((&))
 
 liftDB = liftHandler . runDB
-player gid uid = [TichuPlayerTichuGameId ==. gid, TichuPlayerUserId ==. uid]
+ingame gid      = [TichuPlayerTichuGameId ==. gid]
+player gid uid  = ingame gid ++ [TichuPlayerUserId ==. uid]
+atseat gid seat = ingame gid ++ [TichuPlayerSeat ==. seat]
 
 handleGeneric :: UserId -> GenericMsg -> WebSocketsT Handler ()
 handleGeneric uid PlayerHere = sendTextData ("foo" :: ByteString)
@@ -244,11 +246,14 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) =
         mgame <- get gid
         mplayer <- selectFirst (player gid uid) []
         let mplay = do
+            -- extract all necessary info
             game <- mgame
             Entity pid p <- mplayer
             let board = tichuGameBoard game
                 turn = tichuGameTurn game
                 hand = tichuPlayerHand p
+
+            -- make sure the play is valid
             guard $ all (`elem` hand) cards
             play <- resolvePlay cards
             guard $ canPlayOn board play
@@ -256,10 +261,39 @@ tichuAppHandler writeChan readChan gid (Just uid) (Just msg@(TMIPlayed cards)) =
                         case play of
                           Bomb _ _ -> isJust turn && (myturn || not (null board))
                           _ -> myturn
+
+            -- valid play!
+            let nextTurn'' x = do
+                    xplayer <- selectFirst (atseat gid x) []
+                    case tichuPlayerHand . entityVal <$> xplayer of
+                      Just [] -> nextTurn'' $ succ' x
+                      _ -> return x
+                nextTurn' = maybe (return Head1) (nextTurn'' . succ') turn
+
             return $ do
-                update pid [TichuPlayerHand =. [c | c <- hand, c `notElem` cards]]
-                update gid $ [TichuGameBoard =. (cards:board) | not $ null cards] ++
-                             [TichuGameTurn =. succ' <$> turn]
+                nextTurn <- nextTurn'
+                let newBoard = [TichuGameBoard =. (cards:board)]
+                    newTurn  = [TichuGameTurn =. Just nextTurn]
+                case (length cards, length hand - length cards) of
+                    (0, _) -> do
+                        -- passed
+                        whose <- fmap tichuGameWhose <$> get gid
+                        if any (==nextTurn) whose
+                           then return () -- TODO trick over
+                           else update gid newTurn
+                    (_, 0) -> do
+                        -- went out
+                        update pid [TichuPlayerHand =. []]
+                        players <- map entityVal <$> selectList (ingame gid) []
+                        let stillIn = filter (not . null . tichuPlayerHand) players
+                            seats = (`mod` 2) . fromEnum . tichuPlayerSeat <$> stillIn
+                        if 0 `notElem` seats || 1 `notElem` seats
+                           then return () -- TODO game over
+                           else update gid $ newBoard ++ newTurn
+                    _ -> do
+                        -- played without going out
+                        update pid [TichuPlayerHand =. [c | c <- hand, c `notElem` cards]]
+                        update gid $ newBoard ++ newTurn
         case mplay of
           Just playAction -> playAction >> return True
           Nothing -> return False

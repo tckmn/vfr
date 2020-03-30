@@ -17,6 +17,7 @@ Game
 TichuGame
     turn TichuSeat Maybe
     board [TichuCardList]
+    whose TichuSeat
 
 TichuPlayer
     userId UserId
